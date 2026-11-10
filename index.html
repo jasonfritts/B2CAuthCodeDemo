@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azure AD B2C | OAuth Flow Workbench</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <script src="demo-settings.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: 0;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(90deg, transparent 0 79px, var(--cp-sheen) 80px), repeating-linear-gradient(0deg, transparent 0 79px, var(--cp-sheen) 80px);
+      opacity: .35;
+    }
+    button, input { font: inherit; }
+    button { letter-spacing: 0; }
+    .shell { position: relative; max-width: 1500px; margin: 0 auto; padding: 24px; }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+    .eyebrow { color: var(--cp-accent); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    h1 { margin: 4px 0 4px; font-size: clamp(26px, 4vw, 44px); line-height: 1.05; font-weight: 650; letter-spacing: 0; }
+    .subtitle { margin: 0; color: var(--cp-text-muted); max-width: 720px; }
+    .ghost-button, .primary-button, .secondary-button {
+      border: 1px solid var(--cp-border-strong); border-radius: .625rem; min-height: 40px; padding: 8px 14px; cursor: pointer; font-weight: 600;
+    }
+    .ghost-button, .secondary-button { background: var(--cp-surface); color: var(--cp-text); }
+    .primary-button { background: var(--cp-accent); color: var(--cp-accent-fg); border-color: var(--cp-accent); }
+    button:hover { border-color: var(--cp-accent); }
+    .primary-button:hover { background: var(--cp-accent-hover); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .workspace { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
+    .rail { position: sticky; top: 20px; border: 1px solid var(--cp-border); background: var(--cp-panel-strong); border-radius: 16px; overflow: hidden; box-shadow: var(--cp-shadow); }
+    .rail-heading { padding: 16px; border-bottom: 1px solid var(--cp-border); font-weight: 700; }
+    .step-nav { display: block; width: 100%; padding: 13px 16px; border: 0; border-bottom: 1px solid var(--cp-border); background: transparent; color: var(--cp-text-muted); text-align: left; cursor: pointer; }
+    .step-nav:last-child { border-bottom: 0; }
+    .step-nav.current { color: var(--cp-text); background: var(--cp-accent-soft); box-shadow: inset 3px 0 var(--cp-accent); }
+    .step-nav.done { color: var(--cp-success); }
+    .step-number { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; }
+    .main { min-width: 0; }
+    .flow-map { display: grid; grid-template-columns: 1fr 90px 1fr 90px 1fr; align-items: center; padding: 18px; margin-bottom: 20px; border: 1px solid var(--cp-border); background: var(--cp-bg-elevated); border-radius: 16px; overflow: hidden; }
+    .actor { min-width: 0; padding: 14px; border: 1px solid var(--cp-border); background: var(--cp-surface); border-radius: .625rem; text-align: center; }
+    .actor strong, .actor span { display: block; overflow-wrap: anywhere; }
+    .actor span { color: var(--cp-text-muted); font-size: 12px; margin-top: 3px; }
+    .route { position: relative; height: 3px; background: var(--cp-border-strong); }
+    .route::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left-color: var(--cp-border-strong); }
+    .packet { display: none; position: absolute; top: -6px; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--cp-accent); box-shadow: 0 0 0 5px var(--cp-accent-soft); animation: travel 1.5s ease-in-out infinite; }
+    .flow-map.active .packet { display: block; }
+    .flow-map.returning .packet { animation-direction: reverse; }
+    @keyframes travel { from { transform: translateX(0); } to { transform: translateX(76px); } }
+    .panel { border: 1px solid var(--cp-border); border-radius: 16px; background: var(--cp-panel-strong); box-shadow: var(--cp-shadow); overflow: hidden; animation: rise .35s ease-out; }
+    @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .panel-head { display: flex; justify-content: space-between; gap: 20px; padding: 20px; border-bottom: 1px solid var(--cp-border); }
+    .panel-head h2 { margin: 0 0 4px; font-size: 20px; }
+    .panel-head p { margin: 0; color: var(--cp-text-muted); }
+    .status { align-self: flex-start; padding: 5px 9px; border: 1px solid var(--cp-border); border-radius: .625rem; color: var(--cp-text-muted); font-size: 12px; white-space: nowrap; }
+    .status.ready { color: var(--cp-success); border-color: var(--cp-success); }
+    .status.error { color: var(--cp-danger); border-color: var(--cp-danger); }
+    .panel-body { padding: 20px; }
+    .callout { padding: 12px 14px; margin-bottom: 16px; border-left: 3px solid var(--cp-link); background: var(--cp-surface-soft); color: var(--cp-text-muted); }
+    .callout.error { border-left-color: var(--cp-danger); color: var(--cp-danger); }
+    .callout.warning { border-left-color: var(--cp-warning); }
+    .kv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kv { padding: 12px; border: 1px solid var(--cp-border); background: var(--cp-surface); border-radius: .625rem; min-width: 0; }
+    .kv label { display: block; margin-bottom: 5px; color: var(--cp-text-muted); font-size: 11px; text-transform: uppercase; font-weight: 700; }
+    .kv div { font-family: Consolas, "Courier New", Courier, monospace; font-size: 13px; overflow-wrap: anywhere; }
+    .code-block { position: relative; margin: 0 0 16px; border: 1px solid var(--cp-border); background: var(--cp-surface-soft); border-radius: .625rem; overflow: hidden; }
+    .code-label { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--cp-border); color: var(--cp-text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    pre { margin: 0; padding: 14px; max-height: 360px; overflow: auto; color: var(--cp-text); font: 12px/1.55 Consolas, "Courier New", Courier, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .flow-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .flow-choice { padding: 20px; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-surface); }
+    .flow-choice h3 { margin: 0 0 8px; font-size: 18px; }
+    .flow-choice p { min-height: 48px; margin: 0 0 16px; color: var(--cp-text-muted); }
+    .token-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--cp-border); margin-bottom: 16px; }
+    .token-tab { border: 0; border-bottom: 3px solid transparent; padding: 10px 12px; background: transparent; color: var(--cp-text-muted); cursor: pointer; white-space: nowrap; }
+    .token-tab.active { color: var(--cp-text); border-bottom-color: var(--cp-accent); }
+    .hidden { display: none !important; }
+    .footer { padding: 20px 0 4px; color: var(--cp-text-muted); font-size: 12px; text-align: center; }
+    @media (max-width: 900px) {
+      .workspace { grid-template-columns: 1fr; }
+      .rail { position: static; display: flex; overflow-x: auto; }
+      .rail-heading { display: none; }
+      .step-nav { flex: 0 0 auto; width: auto; border-bottom: 0; border-right: 1px solid var(--cp-border); }
+      .step-nav.current { box-shadow: inset 0 -3px var(--cp-accent); }
+      .flow-map { grid-template-columns: 1fr 42px 1fr; }
+      .flow-map .actor:last-child, .flow-map .route:nth-last-child(-n+2) { display: none; }
+      .packet { display: none !important; }
+    }
+    @media (max-width: 600px) {
+      .shell { padding: 14px; }
+      .topbar { display: block; }
+      .topbar button { margin-top: 14px; }
+      .kv-grid { grid-template-columns: 1fr; }
+      .flow-choices { grid-template-columns: 1fr; }
+      .panel-head { display: block; }
+      .status { display: inline-block; margin-top: 10px; }
+      .step-nav { font-size: 12px; padding: 10px; }
+      .step-number { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Protocol workbench</div>
+        <h1 id="workbenchTitle">Azure AD B2C OAuth flows</h1>
+        <p id="workbenchSubtitle" class="subtitle">Choose a flow, then inspect every browser redirect and protocol message one step at a time.</p>
+      </div>
+      <button id="resetButton" class="ghost-button" type="button">Reset demo</button>
+    </header>
+
+    <div class="workspace">
+      <nav class="rail" aria-label="Flow steps">
+        <div class="rail-heading">Flow sequence</div>
+        <div id="stepNavigation"></div>
+      </nav>
+
+      <main class="main">
+        <section id="flowMap" class="flow-map" aria-label="Protocol participants">
+          <div class="actor"><strong>Browser SPA</strong><span>localhost:8400</span></div>
+          <div class="route"><i class="packet"></i></div>
+          <div class="actor"><strong>B2C policy</strong><span id="policyActor">not configured</span></div>
+          <div class="route"><i class="packet"></i></div>
+          <div class="actor"><strong>Token endpoint</strong><span>OAuth 2.0</span></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div><h2 id="stepTitle">Choose a flow</h2><p id="stepDescription">Which OAuth flow do you want to demonstrate?</p></div>
+            <span id="stepStatus" class="status">Waiting</span>
+          </div>
+          <div id="panelBody" class="panel-body"></div>
+        </section>
+      </main>
+    </div>
+    <footer class="footer">Educational sample. Tokens are held only in this tab and sessionStorage.</footer>
+  </div>
+
+  <script>
+    "use strict";
+
+    const STORAGE_KEY = "b2c-oauth-visual-demo";
+    const CALLBACK_KEY = "b2c-oauth-callback";
+    const settings = window.DEMO_SETTINGS || null;
+    const panelBody = document.getElementById("panelBody");
+    const stepTitle = document.getElementById("stepTitle");
+    const stepDescription = document.getElementById("stepDescription");
+    const stepStatus = document.getElementById("stepStatus");
+    const flowMap = document.getElementById("flowMap");
+    const stepNavigation = document.getElementById("stepNavigation");
+    let currentStep = 0;
+    let state = readSession();
+
+    const chooseStep = { id: "choose", title: "Choose a flow", description: "Which OAuth flow do you want to demonstrate?", render: renderFlowChoice };
+    const commonSteps = {
+      config: { id: "config", title: "Configuration", description: "Verify the public settings produced by the setup script.", render: renderConfig },
+      discovery: { id: "discovery", title: "OpenID Connect discovery", description: "Fetch the policy metadata and inspect the resolved endpoints.", render: renderDiscovery },
+      authorize: { id: "authorize", title: "Build authorization request", description: "Inspect every query parameter before redirecting to Azure AD B2C.", render: renderAuthorize },
+      callback: { id: "callback", title: "Inspect authorization response", description: "Validate state and inspect the values returned to the browser.", render: renderCallback },
+      tokens: { id: "tokens", title: "Inspect returned tokens", description: "Decode JWT headers and payloads locally. No signature validation is performed here.", render: renderTokens }
+    };
+
+    function activeSteps() {
+      if (state.flow === "implicit") return [chooseStep, commonSteps.config, commonSteps.discovery, commonSteps.authorize, commonSteps.callback, commonSteps.tokens];
+      if (state.flow === "pkce") return [chooseStep, commonSteps.config, commonSteps.discovery,
+        { id: "pkce", title: "Create PKCE material", description: "Generate a one-time verifier, S256 challenge, and state in the browser.", render: renderPkce },
+        commonSteps.authorize, commonSteps.callback,
+        { id: "exchange", title: "Exchange authorization code", description: "Send the code and verifier directly from the public SPA to the token endpoint.", render: renderExchange },
+        commonSteps.tokens,
+        { id: "refresh", title: "Use refresh token", description: "Optionally redeem the opaque refresh token for a new token set.", render: renderRefresh }];
+      return [chooseStep];
+    }
+
+    function readSession() {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+    }
+
+    function saveSession() {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+    }
+
+    function pretty(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    function setStatus(text, kind = "") {
+      stepStatus.textContent = text;
+      stepStatus.className = `status ${kind}`.trim();
+    }
+
+    function setStep(step) {
+      const steps = activeSteps();
+      currentStep = Math.max(0, Math.min(steps.length - 1, step));
+      const activeStep = steps[currentStep];
+      stepTitle.textContent = activeStep.title;
+      stepDescription.textContent = activeStep.description;
+      stepNavigation.innerHTML = steps.map((item, index) => `<button class="step-nav ${index === currentStep ? "current" : ""} ${index < highestCompletedStep() ? "done" : ""}" data-step="${index}"><span class="step-number">${index + 1}</span>${escapeHtml(item.title)}</button>`).join("");
+      stepNavigation.querySelectorAll(".step-nav").forEach(button => button.addEventListener("click", () => setStep(Number(button.dataset.step))));
+      flowMap.className = "flow-map";
+      renderStep();
+    }
+
+    function setNamedStep(id) {
+      const index = activeSteps().findIndex(step => step.id === id);
+      setStep(index < 0 ? 0 : index);
+    }
+
+    function highestCompletedStep() {
+      const completedId = state.refreshResponse ? "refresh" : state.tokenResponse ? "tokens" : state.callback ? "callback" : state.authUrl ? "authorize" : state.verifier ? "pkce" : state.metadata ? "discovery" : state.flow ? "config" : "choose";
+      return Math.max(0, activeSteps().findIndex(step => step.id === completedId));
+    }
+
+    function codeBlock(label, content) {
+      return `<div class="code-block"><div class="code-label"><span>${escapeHtml(label)}</span></div><pre>${escapeHtml(content)}</pre></div>`;
+    }
+
+    function errorCallout(message) {
+      return `<div class="callout error">${escapeHtml(message)}</div>`;
+    }
+
+    function renderStep() {
+      panelBody.replaceChildren();
+      activeSteps()[currentStep].render();
+    }
+
+    function renderFlowChoice() {
+      document.getElementById("workbenchTitle").textContent = "Azure AD B2C OAuth flows";
+      document.getElementById("workbenchSubtitle").textContent = "Choose a flow, then inspect every browser redirect and protocol message one step at a time.";
+      panelBody.innerHTML = `<div class="flow-choices"><section class="flow-choice"><h3>Implicit flow</h3><p>Receive an ID token and API access token directly in the redirect URI fragment.</p><button class="primary-button" data-flow="implicit" type="button">Demo implicit flow</button></section><section class="flow-choice"><h3>Authorization Code with PKCE</h3><p>Receive a short-lived code, then redeem it with a browser-generated verifier for API tokens.</p><button class="primary-button" data-flow="pkce" type="button">Demo authorization code + PKCE</button></section></div>`;
+      setStatus("Choose a flow");
+      panelBody.querySelectorAll("[data-flow]").forEach(button => button.addEventListener("click", () => {
+        state = { flow: button.dataset.flow };
+        saveSession();
+        setNamedStep("config");
+      }));
+    }
+
+    function renderConfig() {
+      if (!settings) {
+        setStatus("Configuration missing", "error");
+        panelBody.innerHTML = errorCallout("demo-settings.js was not found. Run Setup-B2CAuthCodeDemo.ps1, then reload this page.");
+        return;
+      }
+      document.getElementById("policyActor").textContent = settings.policyId;
+      const isImplicit = state.flow === "implicit";
+      document.getElementById("workbenchTitle").textContent = isImplicit ? "Implicit flow" : "Authorization Code + PKCE";
+      document.getElementById("workbenchSubtitle").textContent = isImplicit ? "Inspect front-channel ID and access tokens returned in the URL fragment." : "Inspect authorization-code redemption for API access without requesting an ID token.";
+      const fields = [
+        ["Tenant", settings.tenantDomain], ["Policy", settings.policyId],
+        ["Flow", isImplicit ? "Implicit" : "Authorization Code with PKCE"],
+        ["Client ID", selectedClientId()], ["Redirect URI", settings.redirectUri],
+        ["API scope", settings.apiScope], ["Refresh token", !isImplicit && settings.requestRefreshToken ? "Requested with offline_access" : "Not requested"]
+      ];
+      panelBody.innerHTML = `<div class="callout">${isImplicit ? "The authorization endpoint returns tokens through the browser front channel. No token endpoint call follows." : "The browser is a public client. PKCE binds the authorization code to this tab; no client secret or ID token is requested."}</div><div class="kv-grid">${fields.map(([label, value]) => `<div class="kv"><label>${escapeHtml(label)}</label><div>${escapeHtml(value)}</div></div>`).join("")}</div><div class="actions"><button id="configNext" class="primary-button" type="button">Begin discovery</button></div>`;
+      setStatus("Loaded", "ready");
+      document.getElementById("configNext").addEventListener("click", () => setNamedStep("discovery"));
+    }
+
+    function discoveryUrl() {
+      return `https://${settings.tenantSubdomain}.b2clogin.com/${settings.tenantDomain}/${settings.policyId}/v2.0/.well-known/openid-configuration`;
+    }
+
+    function renderDiscovery() {
+      if (!settings) return renderConfig();
+      const url = discoveryUrl();
+      const nextLabel = state.flow === "pkce" ? "Continue to PKCE" : "Build authorize request";
+      panelBody.innerHTML = `${codeBlock("GET request", url)}${state.metadata ? codeBlock("200 response", pretty(state.metadata)) : ""}<div class="actions"><button id="fetchDiscovery" class="primary-button" type="button">${state.metadata ? "Fetch again" : "Send discovery request"}</button>${state.metadata ? `<button id="discoveryNext" class="secondary-button" type="button">${nextLabel}</button>` : ""}</div>`;
+      setStatus(state.metadata ? "Response received" : "Ready to send", state.metadata ? "ready" : "");
+      document.getElementById("fetchDiscovery").addEventListener("click", fetchDiscovery);
+      document.getElementById("discoveryNext")?.addEventListener("click", () => state.flow === "pkce" ? setNamedStep("pkce") : buildAuthorizeRequest());
+    }
+
+    async function fetchDiscovery() {
+      setStatus("Request in flight");
+      flowMap.classList.add("active");
+      try {
+        const response = await fetch(discoveryUrl(), { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}\n${pretty(body)}`);
+        state.metadata = body;
+        saveSession();
+        renderDiscovery();
+      } catch (error) {
+        setStatus("Request failed", "error");
+        panelBody.insertAdjacentHTML("afterbegin", errorCallout(error.message));
+      } finally { flowMap.classList.remove("active"); }
+    }
+
+    function randomBase64Url(byteLength) {
+      const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+      return bytesToBase64Url(bytes);
+    }
+
+    function bytesToBase64Url(bytes) {
+      let binary = "";
+      bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    async function sha256Base64Url(value) {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+      return bytesToBase64Url(new Uint8Array(digest));
+    }
+
+    function renderPkce() {
+      const values = state.verifier ? `<div class="kv-grid"><div class="kv"><label>code_verifier (secret to this tab)</label><div>${escapeHtml(state.verifier)}</div></div><div class="kv"><label>code_challenge = BASE64URL(SHA256(verifier))</label><div>${escapeHtml(state.challenge)}</div></div><div class="kv"><label>state (callback correlation)</label><div>${escapeHtml(state.oauthState)}</div></div></div>` : "";
+      panelBody.innerHTML = `<div class="callout">Web Crypto generates 256 bits of entropy. Only the challenge leaves the browser during authorization; the verifier is revealed later at token redemption.</div>${values}<div class="actions"><button id="generatePkce" class="primary-button" type="button">${state.verifier ? "Generate new values" : "Generate PKCE values"}</button>${state.verifier ? '<button id="pkceNext" class="secondary-button" type="button">Build authorize request</button>' : ""}</div>`;
+      setStatus(state.verifier ? "Generated" : "Not generated", state.verifier ? "ready" : "");
+      document.getElementById("generatePkce").addEventListener("click", generatePkce);
+      document.getElementById("pkceNext")?.addEventListener("click", buildAuthorizeRequest);
+    }
+
+    async function generatePkce() {
+      const verifier = randomBase64Url(32);
+      state = { flow: state.flow, metadata: state.metadata, verifier, challenge: await sha256Base64Url(verifier), oauthState: randomBase64Url(24) };
+      saveSession();
+      renderPkce();
+    }
+
+    function selectedClientId() {
+      return state.flow === "implicit" ? settings.implicitClientId : settings.pkceClientId;
+    }
+
+    function requestedScopes() {
+      if (state.flow === "implicit") return ["openid", "profile", settings.apiScope].join(" ");
+      return [settings.apiScope, settings.requestRefreshToken ? "offline_access" : null].filter(Boolean).join(" ");
+    }
+
+    function buildAuthorizeRequest() {
+      const endpoint = state.metadata?.authorization_endpoint;
+      if (!endpoint) { setNamedStep("discovery"); return; }
+      if (state.flow === "implicit") {
+        state.oauthState = randomBase64Url(24);
+        state.nonce = randomBase64Url(24);
+      }
+      const url = new URL(endpoint);
+      const parameters = state.flow === "implicit" ? {
+        client_id: selectedClientId(), response_type: "id_token token", redirect_uri: settings.redirectUri,
+        response_mode: "fragment", scope: requestedScopes(), state: state.oauthState, nonce: state.nonce
+      } : {
+        client_id: selectedClientId(), response_type: "code", redirect_uri: settings.redirectUri,
+        response_mode: "query", scope: requestedScopes(), code_challenge: state.challenge,
+        code_challenge_method: "S256", state: state.oauthState
+      };
+      Object.entries(parameters).forEach(([key, value]) => url.searchParams.set(key, value));
+      state.authParameters = parameters;
+      state.authUrl = url.toString();
+      saveSession();
+      setNamedStep("authorize");
+    }
+
+    function renderAuthorize() {
+      if (!state.authUrl) {
+        panelBody.innerHTML = errorCallout("Generate PKCE material before building this request.");
+        setStatus("Not ready", "error");
+        return;
+      }
+      const explanation = state.flow === "implicit" ? "response_type=id_token token asks B2C to place both tokens in the redirect fragment. The nonce binds the ID token to this request." : "Only an authorization code is returned here. The API is the single token resource; offline_access is resource-neutral, and openid remains omitted so no ID token is requested.";
+      panelBody.innerHTML = `${codeBlock("Authorization endpoint", state.metadata.authorization_endpoint)}${codeBlock("Query parameters", pretty(state.authParameters))}${codeBlock("Complete redirect URL", state.authUrl)}<div class="callout">${explanation}</div><div class="callout warning">Continuing leaves this page for the B2C policy. Correlation values remain in sessionStorage for the callback.</div><div class="actions"><button id="sendAuthorize" class="primary-button" type="button">Redirect to sign in</button></div>`;
+      setStatus("Ready to redirect", "ready");
+      document.getElementById("sendAuthorize").addEventListener("click", () => {
+        flowMap.classList.add("active");
+        window.location.assign(state.authUrl);
+      });
+    }
+
+    function captureCallback() {
+      const query = new URLSearchParams(window.location.search);
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+      if (!query.has("code") && !query.has("error") && !fragment.has("id_token") && !fragment.has("access_token") && !fragment.has("error")) return false;
+      const callback = Object.fromEntries([...query.entries(), ...fragment.entries()]);
+      sessionStorage.setItem(CALLBACK_KEY, JSON.stringify(callback));
+      state.callback = callback;
+      saveSession();
+      history.replaceState({}, document.title, window.location.pathname);
+      return true;
+    }
+
+    function renderCallback() {
+      const callback = state.callback || JSON.parse(sessionStorage.getItem(CALLBACK_KEY) || "null");
+      if (!callback) {
+        panelBody.innerHTML = errorCallout("No authorization response has returned to this tab yet.");
+        setStatus("Waiting");
+        return;
+      }
+      const stateMatches = callback.state === state.oauthState;
+      const hasError = Boolean(callback.error);
+      const isImplicit = state.flow === "implicit";
+      const decodedIdToken = isImplicit ? decodeJwt(callback.id_token) : null;
+      const audience = decodedIdToken?.payload.aud;
+      const audienceMatches = Array.isArray(audience) ? audience.includes(selectedClientId()) : audience === selectedClientId();
+      const nonceMatches = decodedIdToken?.payload.nonce === state.nonce;
+      const callbackIsValid = stateMatches && (isImplicit ? Boolean(callback.id_token && callback.access_token && nonceMatches && audienceMatches) : Boolean(callback.code));
+      if (isImplicit && callbackIsValid) state.tokenResponse = callback;
+      saveSession();
+      const responseLabel = isImplicit ? "Redirect fragment parameters" : "Redirect query parameters";
+      const responseDetails = isImplicit ? `<div class="kv"><label>ID token</label><div>${callback.id_token ? `${callback.id_token.length} characters` : "Not returned"}</div></div><div class="kv"><label>Access token</label><div>${callback.access_token ? `${callback.access_token.length} characters` : "Not returned"}</div></div><div class="kv"><label>Nonce and audience</label><div>${nonceMatches && audienceMatches ? "PASS" : "FAIL"}</div></div>` : `<div class="kv"><label>Authorization code</label><div>${callback.code ? `${callback.code.length} characters; single use` : "Not returned"}</div></div>`;
+      panelBody.innerHTML = `${hasError ? errorCallout(`${callback.error}: ${callback.error_description || "No description returned"}`) : ""}${codeBlock(responseLabel, pretty(callback))}<div class="kv-grid"><div class="kv"><label>State validation</label><div>${stateMatches ? "PASS - response belongs to this request" : "FAIL - discard this response"}</div></div>${responseDetails}</div><div class="actions"><button id="callbackNext" class="primary-button" type="button" ${!callbackIsValid ? "disabled" : ""}>${isImplicit ? "Inspect returned tokens" : "Prepare token exchange"}</button></div>`;
+      setStatus(hasError || !callbackIsValid ? "Validation failed" : "Validated", hasError || !callbackIsValid ? "error" : "ready");
+      flowMap.classList.add("returning");
+      document.getElementById("callbackNext").addEventListener("click", () => setNamedStep(isImplicit ? "tokens" : "exchange"));
+    }
+
+    function tokenRequestBody(grantType = "authorization_code") {
+      if (grantType === "refresh_token") {
+        return { client_id: selectedClientId(), grant_type: "refresh_token", refresh_token: state.tokenResponse.refresh_token, scope: requestedScopes() };
+      }
+      return { client_id: selectedClientId(), grant_type: "authorization_code", code: state.callback.code, redirect_uri: settings.redirectUri, code_verifier: state.verifier, scope: requestedScopes() };
+    }
+
+    function renderExchange() {
+      if (!state.callback?.code) {
+        panelBody.innerHTML = errorCallout("An authorization code is required.");
+        setStatus("Not ready", "error");
+        return;
+      }
+      const body = tokenRequestBody();
+      panelBody.innerHTML = `${codeBlock("POST endpoint", state.metadata.token_endpoint)}${codeBlock("Content-Type", "application/x-www-form-urlencoded")}${codeBlock("Form body", new URLSearchParams(body).toString().replaceAll("&", "\n&"))}${state.tokenError ? errorCallout(state.tokenError) : ""}<div class="callout">The code verifier proves this is the same browser that created the S256 challenge. No client secret is sent.</div><div class="actions"><button id="exchangeCode" class="primary-button" type="button">Send token request</button></div>`;
+      setStatus("Ready to send", "ready");
+      document.getElementById("exchangeCode").addEventListener("click", () => exchangeToken("authorization_code"));
+    }
+
+    async function exchangeToken(grantType) {
+      setStatus("Request in flight");
+      flowMap.classList.add("active");
+      try {
+        const response = await fetch(state.metadata.token_endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(tokenRequestBody(grantType))
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(`${body.error || response.status}: ${body.error_description || response.statusText}`);
+        if (grantType === "refresh_token") {
+          state.refreshResponse = body;
+        } else {
+          if (!body.access_token) throw new Error("B2C did not return the requested API access token.");
+          state.tokenResponse = body;
+        }
+        delete state.tokenError;
+        saveSession();
+        setNamedStep(grantType === "refresh_token" ? "refresh" : "tokens");
+      } catch (error) {
+        state.tokenError = error.message;
+        saveSession();
+        setStatus("Request failed", "error");
+        renderStep();
+      } finally { flowMap.classList.remove("active"); }
+    }
+
+    function decodeJwt(token) {
+      if (!token || token.split(".").length !== 3) return null;
+      try {
+        const decodePart = part => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=")), character => character.charCodeAt(0))));
+        const parts = token.split(".");
+        return { header: decodePart(parts[0]), payload: decodePart(parts[1]), signature: `${parts[2].length} base64url characters (not validated by this inspector)` };
+      } catch { return null; }
+    }
+
+    function renderTokens() {
+      const response = state.tokenResponse;
+      if (!response) {
+        panelBody.innerHTML = errorCallout("No token response is available.");
+        setStatus("Waiting");
+        return;
+      }
+      const idToken = response.id_token;
+      const tokenNames = [idToken ? "id_token" : null, response.access_token ? "access_token" : null, response.refresh_token ? "refresh_token" : null, "raw_response"].filter(Boolean);
+      panelBody.innerHTML = `<div class="token-tabs">${tokenNames.map((name, index) => `<button class="token-tab ${index === 0 ? "active" : ""}" data-token="${name}" type="button">${name.replace("_", " ")}</button>`).join("")}</div><div id="tokenContent"></div><div class="actions"><button id="tokenNext" class="primary-button" type="button">${response.refresh_token ? "Continue to refresh grant" : "Finish"}</button></div>`;
+      setStatus("Tokens received", "ready");
+      const showToken = name => {
+        document.querySelectorAll(".token-tab").forEach(tab => tab.classList.toggle("active", tab.dataset.token === name));
+        const target = document.getElementById("tokenContent");
+        if (name === "raw_response") {
+          const source = state.flow === "implicit" ? "authorization redirect fragment" : "PKCE-protected token endpoint";
+          target.innerHTML = `${codeBlock(state.flow === "implicit" ? "Redirect fragment" : "Token endpoint JSON", pretty(response))}<div class="callout">These values were returned by the ${source}.</div>`;
+        } else if (name === "refresh_token") {
+          target.innerHTML = `<div class="callout warning">Refresh tokens are opaque credentials, not JWTs. There is no supported client-side decoding operation.</div>${codeBlock("Opaque refresh token", response.refresh_token)}${codeBlock("Observable metadata", pretty({ characters: response.refresh_token.length, requestedWith: "offline_access", use: "Redeem only at the token endpoint" }))}`;
+        } else {
+          const tokenValue = name === "id_token" ? idToken : response[name];
+          const decoded = decodeJwt(tokenValue);
+          target.innerHTML = decoded ? `${codeBlock(`${name} header`, pretty(decoded.header))}${codeBlock(`${name} payload`, pretty(decoded.payload))}${codeBlock(`${name} signature`, decoded.signature)}${codeBlock(`Raw ${name}`, tokenValue)}` : `${errorCallout(`${name} is not a three-part JWT.`)}${codeBlock(`Raw ${name}`, tokenValue)}`;
+        }
+      };
+      document.querySelectorAll(".token-tab").forEach(tab => tab.addEventListener("click", () => showToken(tab.dataset.token)));
+      showToken(tokenNames[0]);
+      document.getElementById("tokenNext").addEventListener("click", () => response.refresh_token ? setNamedStep("refresh") : setNamedStep("choose"));
+    }
+
+    function renderRefresh() {
+      const refreshToken = state.tokenResponse?.refresh_token;
+      if (!refreshToken) {
+        panelBody.innerHTML = `<div class="callout warning">No refresh token was returned. Enable requestRefreshToken in setup so the authorization request includes offline_access.</div>`;
+        setStatus("Unavailable");
+        return;
+      }
+      const body = tokenRequestBody("refresh_token");
+      panelBody.innerHTML = `${codeBlock("POST endpoint", state.metadata.token_endpoint)}${codeBlock("Refresh grant form body", new URLSearchParams(body).toString().replaceAll("&", "\n&"))}<div class="callout">The refresh token replaces the authorization code and PKCE verifier. B2C may rotate it, so a client must retain the newest returned refresh token.</div>${state.refreshResponse ? renderRefreshedTokens(state.refreshResponse) : ""}${state.tokenError ? errorCallout(state.tokenError) : ""}<div class="actions"><button id="redeemRefresh" class="primary-button" type="button">${state.refreshResponse ? "Redeem again" : "Redeem refresh token"}</button>${state.refreshResponse ? '<button id="inspectNewTokens" class="secondary-button" type="button">Inspect new token response</button>' : ""}</div>`;
+      setStatus(state.refreshResponse ? "New tokens received" : "Ready to send", "ready");
+      document.getElementById("redeemRefresh").addEventListener("click", () => exchangeToken("refresh_token"));
+      document.getElementById("inspectNewTokens")?.addEventListener("click", () => {
+        state.tokenResponse = state.refreshResponse;
+        delete state.refreshResponse;
+        saveSession();
+        setNamedStep("tokens");
+      });
+    }
+
+    function renderRefreshedTokens(response) {
+      const summary = {
+        token_type: response.token_type,
+        expires_in: response.expires_in,
+        access_token: response.access_token ? `${response.access_token.length} characters` : "not returned",
+        id_token: response.id_token ? `${response.id_token.length} characters` : "not returned",
+        refresh_token: response.refresh_token ? `${response.refresh_token.length} characters (rotated)` : "not returned"
+      };
+      return codeBlock("New token response summary", pretty(summary));
+    }
+
+    document.getElementById("resetButton").addEventListener("click", () => {
+      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(CALLBACK_KEY);
+      state = {};
+      setStep(0);
+    });
+
+    if (settings) document.getElementById("policyActor").textContent = settings.policyId;
+    const returnedFromAuthorize = captureCallback();
+    if (returnedFromAuthorize || state.callback) {
+      setNamedStep("callback");
+    } else if (state.flow) {
+      setStep(Math.min(highestCompletedStep(), activeSteps().length - 1));
+    } else {
+      setNamedStep("choose");
+    }
+  </script>
+</body>
+</html>
